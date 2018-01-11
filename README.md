@@ -1,6 +1,8 @@
 # Coursera Dump
 
-[TODO. There will be project description]
+This programm collects data from 20 random Coursera courses and outputs data to xlsx file.
+
+
 
 # Project Goals
 
