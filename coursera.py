@@ -3,71 +3,69 @@ import requests
 from lxml import etree
 from openpyxl import Workbook
 import sys
+import random
 
 
-def get_courses_list():
+def get_courses_links():
     list_of_links = []
     coursera_xml_url = "https://www.coursera.org/sitemap~www~courses.xml"
-    coursera_data = requests.get(coursera_xml_url).content
+    coursera_data = request_page_info(coursera_xml_url)
     for link in etree.fromstring(coursera_data).getchildren():
         list_of_links.append(link.getchildren()[0].text.strip())
     return list_of_links
 
 
+def request_page_info(link):
+    webpage = requests.get(link).content
+    return webpage
+
+
 def get_course_info(link):
-    course_info = []
-    get_a_webpage = requests.get(link)
-    soup = BeautifulSoup(get_a_webpage.content, "html.parser")
-    get_header = soup.html.head.title.string
-    header_div = get_header.find("|")
-    header = get_header[:header_div]
-    course_info.append(header)
-    language_of_course = soup.find_all("div", "rc-Language")[0].next.next
-    course_info.append(language_of_course)
-    date = soup.find_all("div", "startdate rc-StartDateString caption-text", 'span')[0].next.next
-    course_info.append(date)
-    amount_of_weeks = len(soup.find_all('div', 'week'))
-    course_info.append(amount_of_weeks)
-    if soup.find_all('div', 'ratings-info'):
-        raiting = soup.find_all('div', 'ratings-text bt3-visible-xs')[0].next.next
+    course_info = {}
+    soup = BeautifulSoup(request_page_info(link), "html.parser")
+    course_name = soup.find("h1", attrs={"class": "title display-3-text"}).text
+    course_info["name"] = course_name
+    course_lang = soup.find("div", attrs={"class": "rc-Language"}).text
+    course_info["language"] = course_lang
+    starting_date = (soup.find("div",
+                               attrs={"class": "startdate rc-StartDateString caption-text"}).text).split()
+    course_info["date"] = " ".join(starting_date[1:])
+    course_info["weeks"] = len(soup.find_all("div", "week"))
+    rating_tr = soup.find("div", attrs={"class": "ratings-text bt3-hidden-xs"})
+    if rating_tr is None:
+        course_info["rating"] = "None"
     else:
-        raiting = "raiting is absent"
-    course_info.append(raiting)
+        average_user_rating = rating_tr.find("span").text.split()
+        course_info["rating"] = average_user_rating[-1]
     return course_info
 
 
-def output_courses_info_to_xlsx(list_of_links, xlsfilename):
-    column = 1
-    row = 2
-    exel_file = Workbook()
-    active_exel_sheet = exel_file.active
-    active_exel_sheet['A1'] = "Course name"
-    active_exel_sheet['B1'] = "Language"
-    active_exel_sheet['C1'] = "Start date"
-    active_exel_sheet['D1'] = "Number of weeks"
-    active_exel_sheet['E1'] = "Raiting"
+def output_courses_info_to_xlsx(list_of_links, filename):
+    wb = Workbook()
+    active_exel_sheet = wb.active
+    head_line = ["Course name",
+                 "Language",
+                 "Start Date"
+                 "Duration, weeks",
+                 "Rating"]
+    active_exel_sheet.append(head_line)
     for link in list_of_links:
-        course_info = get_course_info(link)
-        for feature in course_info:
-            active_exel_sheet.cell(row=row, column=column).value = feature
-            exel_file.save(xlsfilename)
-            column += 1
-        column = 1
-        row += 1
-
+        dict_of_course_info = get_course_info(link)
+        active_exel_sheet.append([
+            dict_of_course_info["name"],
+            dict_of_course_info["language"],
+            dict_of_course_info["date"],
+            dict_of_course_info["weeks"],
+            dict_of_course_info["rating"]
+        ])
+    wb.save(filename=filename)
 
 
 if __name__ == '__main__':
     if len(sys.argv) > 1:
-        xlsfilename = sys.argv[1]
+        xls_filename = sys.argv[1]
+        num_of_courses = 20
         list_of_links = []
-        count = 0
-        number_of_random_coursera_courses = 20
-        while count != number_of_random_coursera_courses:
-            list_of_links.append(get_courses_list()[count])
-            count += 1
-        output_courses_info_to_xlsx(list_of_links, xlsfilename)
-        print("Done! Thank you for using the program.")
-    else:
-        print("Please also enter a valid xlsx file.")
-
+        list_of_links = random.sample(get_courses_links(), num_of_courses)
+        output_courses_info_to_xlsx(list_of_links, xls_filename)
+    print("Done! Thank you for using the program.")
