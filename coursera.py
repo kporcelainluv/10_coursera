@@ -6,10 +6,9 @@ import sys
 import random
 
 
-def get_courses_links():
+def get_courses_links(url):
     list_of_links = []
-    coursera_xml_url = "https://www.coursera.org/sitemap~www~courses.xml"
-    coursera_data = request_page_info(coursera_xml_url)
+    coursera_data = request_page_info(url)
     for link in etree.fromstring(coursera_data).getchildren():
         list_of_links.append(link.getchildren()[0].text.strip())
     return list_of_links
@@ -33,22 +32,26 @@ def get_course_info(link):
     course_info["weeks"] = len(soup.find_all("div", "week"))
     rating_tr = soup.find("div", attrs={"class": "ratings-text bt3-hidden-xs"})
     if rating_tr is None:
-        course_info["rating"] = "None"
+        course_info["rating"] = None
     else:
         average_user_rating = rating_tr.find("span").text.split()
         course_info["rating"] = average_user_rating[-1]
     return course_info
 
 
-def output_courses_info_to_xlsx(list_of_links, filename):
+def create_wb():
     wb = Workbook()
     active_exel_sheet = wb.active
     head_line = ["Course name",
                  "Language",
-                 "Start Date"
+                 "Start Date",
                  "Duration, weeks",
                  "Rating"]
     active_exel_sheet.append(head_line)
+    return wb, active_exel_sheet
+
+
+def append_info_to_wb(list_of_links, wb, active_exel_sheet):
     for link in list_of_links:
         dict_of_course_info = get_course_info(link)
         active_exel_sheet.append([
@@ -58,14 +61,16 @@ def output_courses_info_to_xlsx(list_of_links, filename):
             dict_of_course_info["weeks"],
             dict_of_course_info["rating"]
         ])
-    wb.save(filename=filename)
+    return wb
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     if len(sys.argv) > 1:
+        url = "https://www.coursera.org/sitemap~www~courses.xml"
         xls_filename = sys.argv[1]
         num_of_courses = 20
-        list_of_links = []
-        list_of_links = random.sample(get_courses_links(), num_of_courses)
-        output_courses_info_to_xlsx(list_of_links, xls_filename)
+        list_of_links = random.sample(get_courses_links(url), num_of_courses)
+        wb, active_exel_sheet = create_wb()
+        wb = append_info_to_wb(list_of_links, wb, active_exel_sheet)
+        wb.save(xls_filename)
     print("Done! Thank you for using the program.")
