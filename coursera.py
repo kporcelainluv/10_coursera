@@ -6,9 +6,8 @@ import sys
 import random
 
 
-def get_courses_links(url):
+def get_courses_links(coursera_data):
     list_of_links = []
-    coursera_data = request_page_info(url)
     for link in etree.fromstring(coursera_data).getchildren():
         list_of_links.append(link.getchildren()[0].text.strip())
     return list_of_links
@@ -19,18 +18,25 @@ def request_page_info(link):
     return webpage
 
 
-def get_course_info(link):
+def get_course_info(attempt):
     course_info = {}
-    soup = BeautifulSoup(request_page_info(link), "html.parser")
+    soup = BeautifulSoup(attempt, "html.parser")
+
     course_name = soup.find("h1", attrs={"class": "title display-3-text"}).text
     course_info["name"] = course_name
+
     course_lang = soup.find("div", attrs={"class": "rc-Language"}).text
     course_info["language"] = course_lang
-    starting_date = (soup.find("div",
-                               attrs={"class": "startdate rc-StartDateString caption-text"}).text).split()
+
+    starting_date_class = "startdate rc-StartDateString caption-text"
+    starting_date = soup.find("div", attrs={"class": starting_date_class})
+    starting_date = starting_date.text.split()
     course_info["date"] = " ".join(starting_date[1:])
+
     course_info["weeks"] = len(soup.find_all("div", "week"))
+
     rating_tr = soup.find("div", attrs={"class": "ratings-text bt3-hidden-xs"})
+
     if rating_tr is None:
         course_info["rating"] = None
     else:
@@ -39,29 +45,24 @@ def get_course_info(link):
     return course_info
 
 
-def create_wb():
-    wb = Workbook()
-    active_exel_sheet = wb.active
+def output_info_to_exel(courses_info):
+    courses_workbook = Workbook()
+    active_exel_sheet = courses_workbook.active
     head_line = ["Course name",
                  "Language",
                  "Start Date",
                  "Duration, weeks",
                  "Rating"]
     active_exel_sheet.append(head_line)
-    return wb, active_exel_sheet
-
-
-def append_info_to_wb(list_of_links, wb, active_exel_sheet):
-    for link in list_of_links:
-        dict_of_course_info = get_course_info(link)
+    for course in courses_info:
         active_exel_sheet.append([
-            dict_of_course_info["name"],
-            dict_of_course_info["language"],
-            dict_of_course_info["date"],
-            dict_of_course_info["weeks"],
-            dict_of_course_info["rating"]
+            course["name"],
+            course["language"],
+            course["date"],
+            course["weeks"],
+            course["rating"]
         ])
-    return wb
+    return courses_workbook
 
 
 if __name__ == "__main__":
@@ -69,8 +70,14 @@ if __name__ == "__main__":
         url = "https://www.coursera.org/sitemap~www~courses.xml"
         xls_filename = sys.argv[1]
         num_of_courses = 20
-        list_of_links = random.sample(get_courses_links(url), num_of_courses)
-        wb, active_exel_sheet = create_wb()
-        wb = append_info_to_wb(list_of_links, wb, active_exel_sheet)
-        wb.save(xls_filename)
+        coursera_data = request_page_info(url)
+        list_of_links = random.sample(get_courses_links(coursera_data), num_of_courses)
+        courses_info = []
+
+        for course_url in list_of_links:
+            attempt = request_page_info(course_url)
+            dict_of_course_info = get_course_info(attempt)
+            courses_info.append(dict_of_course_info)
+        courses_workbook = (output_info_to_exel(courses_info))
+        courses_workbook.save(xls_filename)
     print("Done! Thank you for using the program.")
