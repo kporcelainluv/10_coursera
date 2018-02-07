@@ -13,7 +13,7 @@ def get_courses_links(coursera_data):
     return list_of_links
 
 
-def request_page_info(link):
+def fetch_page_info(link):
     webpage = requests.get(link).content
     return webpage
 
@@ -56,15 +56,13 @@ def output_info_to_excel(courses_info):
     active_exel_sheet.append(head_line)
 
     for course in courses_info:
-        active_exel_sheet.append(
-            [
+        active_exel_sheet.append([
             course["name"],
             course["language"],
             course["date"],
             course["weeks"],
             course["rating"]
-            ]
-        )
+            ])
     return courses_workbook
 
 
@@ -74,15 +72,15 @@ if __name__ == "__main__":
     xls_filename = sys.argv[1]
     url = "https://www.coursera.org/sitemap~www~courses.xml"
     num_of_courses = 20
-    coursera_data = request_page_info(url)
+    coursera_courses_links = fetch_page_info(url)
     list_of_links = random.sample(
-        get_courses_links(coursera_data),
+        get_courses_links(coursera_courses_links),
         num_of_courses
     )
     courses_info = []
 
     for course_url in list_of_links:
-        course_html = request_page_info(course_url)
+        course_html = fetch_page_info(course_url)
         dict_of_course_info = get_course_info(course_html)
         courses_info.append(dict_of_course_info)
     courses_workbook = (output_info_to_excel(courses_info))
